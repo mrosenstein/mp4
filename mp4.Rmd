@@ -8,10 +8,20 @@ output: html_document
 ```{r}
 library(mdsr)
 library(RMySQL)
-db <- dbConnect_scidb(dbname = "imdb")
+db <- dbConnect_scidb(dbname = "airlines")
 db %>%
   dbGetQuery("SELECT * FROM kind_type;")
 
 dbListTables(db)
-dbListFields(db, "title")
+dbListFields(db, "flights")
+dbListFields(db, "weather")
+```
+
+```{r}
+db %>%
+  dbGetQuery("SELECT *
+              FROM flights
+              JOIN 
+              LIMIT 0, 10;")
+
 ```
