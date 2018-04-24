@@ -11,4 +11,7 @@ library(RMySQL)
 db <- dbConnect_scidb(dbname = "imdb")
 db %>%
   dbGetQuery("SELECT * FROM kind_type;")
+
+dbListTables(db)
+dbListFields(db, "title")
 ```
