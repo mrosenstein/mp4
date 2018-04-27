@@ -9,8 +9,7 @@ output: html_document
 library(mdsr)
 library(RMySQL)
 db <- dbConnect_scidb(dbname = "airlines")
-db %>%
-  dbGetQuery("SELECT * FROM kind_type;")
+
 
 dbListTables(db)
 dbListFields(db, "flights")
