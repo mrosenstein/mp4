@@ -25,7 +25,8 @@ db_flights <- db %>%
                      CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
               FROM flights f
               WHERE year = 2013
-              AND month = 1;")
+              AND month = 1
+              AND dest = 'JFK';")
 
 db_weather <- db %>%
   dbGetQuery("SELECT precip, wind_speed,
@@ -38,3 +39,15 @@ my_data <- db_flights %>%
   left_join(db_weather, by = c("date" = "new_date"))
 
 ```
+
+```{r}
+db %>%
+  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.dest,
+                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
+              FROM flights f
+              WHERE year = 2013
+              AND month = 1
+              LIMIT 0, 10;")
+
+```
+}}
