@@ -9,9 +9,10 @@ output: html_document
 library(mdsr)
 library(RMySQL)
 library(stringr)
+library(dplyr)
 db <- dbConnect_scidb(dbname = "airlines")
-db %>%
-  dbGetQuery("SELECT * FROM kind_type;")
+#db %>%
+#  dbGetQuery("SELECT * FROM kind_type;")
 
 dbListTables(db)
 dbListFields(db, "flights")
@@ -21,21 +22,19 @@ dbListFields(db, "weather")
 ```{r}
 db_flights <- db %>%
   dbGetQuery("SELECT f.cancelled, f.dep_delay,
-                     CONCAT(f.year,'-0',f.month,'-',f.day,' ',f.hour,':00') AS date
+                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
               FROM flights f
               WHERE year = 2013
               AND month = 1;")
 
 db_weather <- db %>%
-  dbGetQuery("SELECT year, month, SUBSTRING_INDEX(date, ':', 2) AS new_date, w.precip, w.wind_speed
+  dbGetQuery("SELECT precip, wind_speed,
+                     CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS new_date
               FROM weather w
               WHERE year = 2013
               AND month = 1;")
 
-db %>%
-  dbGetQuery("SELECT CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS f_date,
-                     SUBSTRING_INDEX(w.date, ':', 2) AS w_date,
-                     f.cancelled, f.dep_delay, w.precip, w.wind_speed
-              FROM flights f
-              JOIN weather w ON w_date = f_date;")
+my_data <- db_flights %>%
+  left_join(db_weather, by = c("date" = "new_date"))
+
 ```
