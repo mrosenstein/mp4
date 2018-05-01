@@ -41,6 +41,15 @@ db_weather <- db %>%
               FROM weather w
               WHERE year = 2013
               AND origin = 'JFK';")
+
+db_911 <- db %>%
+  dbGetQuery("SELECT f.cancelled, f.carrier, f.month, f.day, f.flight,
+                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
+              FROM flights f
+              WHERE year = 2001
+              AND month IN (9,10)
+              AND origin = 'BOS'
+              AND dest = 'JFK';")
 ```
 
 ### Data Wrangling
@@ -62,6 +71,15 @@ my_data2 <- db_flights %>%
   group_by(day,carrier) %>%
   summarize(avg_dep_delay = mean(dep_delay), total_dep_delay = sum(dep_delay),avg_wind_speed = mean(wind_speed), 
             avg_wind_gust = mean(wind_gust),total_precip = sum(precip)*100,avg_visib = mean(visib))
+
+# Dataframe for 911 before-and-after comparison
+my_data3 <- db_911 %>%
+  filter(month == 9) %>%
+  mutate(period = ifelse(day %in% c(1,10),"before","after")) %>%
+  group_by(period, carrier) %>%
+  summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
+            pct_chg = total_cancelled/total_flight*100)
+my_data3
 ```
 
 ## Data Visualization
@@ -117,7 +135,7 @@ db %>%
   dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.dest,
                      CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
               FROM flights f
-              WHERE year = 2013
+              WHERE year = 2001
               AND month = 1
               LIMIT 0, 10;")
 
@@ -125,11 +143,18 @@ db %>%
   dbGetQuery("SELECT w.origin, w.precip, w.wind_speed, w.wind_dir, w.wind_gust, w.dewp, w.visib,
                      CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS date
               FROM weather w
-              WHERE year = 2013
+              WHERE year = 2001
               AND month = 1
               LIMIT 0, 10;")
 
 ```
+
+## 911 Before-and-After
+```{r}
+
+
+```
+
 
 [^1]: This database is available on scidb.smith.edu.
 Feel free to check our GitHub repository.^[https://github.com/mrosenstein/mp4.git]
