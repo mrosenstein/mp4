@@ -20,28 +20,14 @@ library(dplyr)
 ```{r}
 db <- dbConnect_scidb(dbname = "airlines")
 
-dbListTables(db)
 # Show the fields under two SQL tables we are interested in
-dbListFields(db, "flights")
-dbListFields(db, "weather")
+#dbListTables(db)
+#dbListFields(db, "flights")
+#dbListFields(db, "weather")
 ```
 
 ### Write queries to retrieve relevant data
 ```{r}
-db_flights <- db %>%
-  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.month, f.day, f.hour,
-                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
-              FROM flights f
-              WHERE year = 2013
-              AND origin = 'JFK';")
-
-db_weather <- db %>%
-  dbGetQuery("SELECT precip, wind_speed, wind_gust, visib,
-                     CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS new_date
-              FROM weather w
-              WHERE year = 2013
-              AND origin = 'JFK';")
-
 db_911 <- db %>%
   dbGetQuery("SELECT f.origin, f.cancelled, f.carrier, f.month, f.day, f.flight,
                      CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
@@ -50,12 +36,58 @@ db_911 <- db %>%
               AND month IN (8,9,10)
               AND origin IN ('BOS','SFO','LAX')
               AND dest = 'JFK';")
+
+db_flights <- db %>%
+  dbGetQuery("SELECT f.cancelled, f.flight, f.dep_delay, f.carrier, f.year,f.month, f.day, f.hour,
+                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
+              FROM flights f
+              WHERE year IN (2001,2002,2003,2004,2013)
+              AND dest = 'JFK';")
+
+db_weather <- db %>%
+  dbGetQuery("SELECT precip, wind_speed, wind_gust, visib,
+                     CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS new_date
+              FROM weather w
+              WHERE year = 2013;")
 ```
 
 ### Data Wrangling
 ```{r}
+# Dataframe for 911 before-and-after comparison
+my_data1 <- db_911 %>%
+  mutate(new_date = as.POSIXct(date,format="%Y-%m-%d %H:%M")) %>%
+  filter(new_date > '2001-08-10 09:00' && new_date < '2001-10-11 09:00') %>%
+  mutate(period = ifelse(new_date < '2001-09-11 09:00',"before","after")) %>%
+  group_by(period, origin,carrier) %>%
+  summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
+            pct_chg = total_cancelled/total_flight*100)
+my_data1$period <- factor(my_data1$period, levels = c("before","after"))
+
+
+# Dataframe for total flights in Semptember from 2001 to 2004
+my_data2 <- db_flights %>%
+  mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
+  filter(year %in% c(2001,2002,2003,2004), month == 9) %>%
+  group_by(year,day) %>% #,carrier
+  summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
+            pct_chg = total_cancelled/total_flight*100)
+
+# Dataframe for day-to-day (September 2013 only) variation
+my_data3 <- db_flights %>%
+  filter(year == 2013, month == 9) %>%
+  left_join(db_weather, by = c("date" = "new_date")) %>%
+  mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
+  filter(!is.na(wind_speed), !is.na(precip)) %>%
+  group_by(day) %>% #,carrier
+  summarize(total_cancelled = sum(cancelled), total_flight = sum(flight),
+            rate_cancelled = total_cancelled/total_flight,
+            avg_dep_delay = mean(dep_delay), total_dep_delay = sum(dep_delay),
+            avg_wind_speed = mean(wind_speed), 
+            total_precip = sum(precip)) #*100
+
+
 # Dataframe for month-to-month variation
-my_data <- db_flights %>%
+my_data_4 <- db_flights %>%
   left_join(db_weather, by = c("date" = "new_date")) %>%
   mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
   filter(!is.na(wind_speed), !is.na(precip)) %>%
@@ -63,63 +95,57 @@ my_data <- db_flights %>%
   summarize(total_cancelled = sum(cancelled), avg_wind_speed = mean(wind_speed), 
             avg_wind_gust = mean(wind_gust),total_precip = sum(precip),avg_visib = mean(visib))
 
-# Dataframe for day-to-day (January only) variation
-my_data2 <- db_flights %>%
-  left_join(db_weather, by = c("date" = "new_date")) %>%
-  mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
-  filter(!is.na(wind_speed), !is.na(precip), month == 9) %>%
-  group_by(day,carrier) %>%
-  summarize(avg_dep_delay = mean(dep_delay), total_dep_delay = sum(dep_delay),avg_wind_speed = mean(wind_speed), 
-            avg_wind_gust = mean(wind_gust),total_precip = sum(precip)*100,avg_visib = mean(visib))
-
-# Dataframe for 911 before-and-after comparison
-my_data3 <- db_911 %>%
-  mutate(new_date = as.POSIXct(date,format="%Y-%m-%d %H:%M")) %>%
-  filter(new_date > '2001-08-10 09:00' && new_date < '2011-10-11 09:00') %>%
-  mutate(period = ifelse(new_date < '2001-09-11 09:00',"before","after")) %>%
-  group_by(period, origin,carrier) %>%
-  summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
-            pct_chg = total_cancelled/total_flight*100)
-my_data3$period <- factor(my_data3$period, levels = c("before","after"))
 ```
 
 ## Data Visualization
-### 2013 Month-to Month variation
-```{r}
-my_plot1 <- my_data %>%
-  filter(carrier == 'UA') %>%
-  ggplot() +
-  geom_bar(aes(x = month, y = total_cancelled), stat = "identity") +
-  geom_line(aes(x = month, y = avg_wind_speed, color = "Monthly Average Wind Speed (mph)"))+
-  geom_line(aes(x = month, y = total_precip, color = "Total Monthly Precipitation (inches)"))+
-  scale_x_continuous(breaks = seq(1,12,1))+
-  scale_colour_manual("", values=c("Monthly Average Wind Speed (mph)" = "blue", 
-                                   "Total Monthly Precipitation (inches)" = "red"))+
-  labs(x = "Month", y= "Number of Cancelled Flights",
-       title = "Number of Cancelled Flights per Month in 2013")+
-  theme_bw()+
-  theme(plot.title = element_text(hjust = 0.5),
-        legend.key = element_blank(),
-        legend.title = element_blank(),
-        legend.box = "horizontal",
-        legend.position = "top")
 
-my_plot1
+## 911 Before-and-After Change in Total Flights Cancellation 
+```{r}
+my_plot_911 <- my_data1 %>%
+  ggplot(aes(x=carrier, y=total_cancelled, fill = period)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  labs(y = "Total Flights Cancellation",
+       title = "Flights to New York JFK Airport",
+       subtitle = "One Month Before and After 9/11 Attack") +
+  scale_fill_manual("", values=c("before" = "blue", 
+                                  "after" = "red"))+
+  theme_bw() +
+  facet_grid(origin~.)
+
+my_plot_911
+#ggsave("before_and_after.png",  my_plot_911, height = 12, width = 9)
 ```
 
-### January 2013 Day-to-Day Variation
+
+### Total Flights in September in 2001, 2002,2003,2004.
 ```{r}
-my_plot2 <- my_data2 %>%
-  filter(carrier == 'UA') %>%
+my_plot_flights <- my_data2 %>%
   ggplot() +
-  geom_bar(aes(x = day, y = avg_dep_delay), stat = "identity") +
+  geom_line(aes(x = day, y =total_flight,color = factor(year))) +
+  geom_vline(xintercept = 11, color = "black") +
+  scale_x_continuous(breaks = seq(1,30,1), limits = c(1,30))+
+  scale_y_continuous(labels = c("100K","200K","300K","400K"),breaks = c(100000,200000,300000,400000))+
+  labs(title = "Total Flights to JFK Airports in Semptember in 2001, 2002, 2003, and 2004",
+       y = "Total Flights", x = "Date in September") +
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+my_plot_flights
+```
+
+### September 2013 Day-to-Day Variation
+```{r}
+my_plot3 <- my_data3 %>%
+  #filter(carrier == 'UA') %>%
+  ggplot() +
+  geom_bar(aes(x = day, y = total_cancelled), stat = "identity") +
   geom_line(aes(x = day, y = avg_wind_speed, color = "Daily Average Wind Speed (mph)"))+
   geom_line(aes(x = day, y = total_precip, color = "Total Daily Precipitation (inches)"))+
   scale_x_continuous(breaks = seq(1,31,1))+
   scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "blue", 
                                    "Total Daily Precipitation (inches)" = "red"))+
-  labs(x = "Date", y= "Average Departure Delay (Minute)",
-       title = "September 2013 Daily Average Departure Delay")+
+  labs(x = "Date", y= "Total Flights Cancellation",
+       title = "September 2013 Total Flights Cancellation")+
   theme_bw()+
   theme(plot.title = element_text(hjust = 0.5),
         legend.key = element_blank(),
@@ -127,23 +153,7 @@ my_plot2 <- my_data2 %>%
         legend.box = "horizontal",
         legend.position = "top")
 
-my_plot2
-```
-
-
-## 911 Before-and-After Change in Total Flights Cancellation 
-```{r}
-my_plot3 <- my_data3 %>%
-  ggplot(aes(x=carrier, y=total_cancelled, fill = period)) +
-  geom_bar(stat = 'identity', position = 'dodge') +
-  labs(y = "Total Flights Cancellation",
-       title = "Flights from Boston Logan Airport to New York JFK Airport",
-       subtitle = "One Month Before and After 9/11 Attack") +
-  theme_bw() +
-  facet_grid(origin~.)
-
 my_plot3
-ggsave("before_and_after.png",  my_plot3,height = 12, width = 9)
 ```
 
 ## Show the first 10 rows of the two datasets [will be deleted when project is done]
@@ -161,8 +171,7 @@ db %>%
   dbGetQuery("SELECT w.origin, w.precip, w.wind_speed, w.wind_dir, w.wind_gust, w.dewp, w.visib,
                      CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS date
               FROM weather w
-              WHERE year = 2001
-              AND month = 1
+              WHERE year = 2015
               LIMIT 0, 10;")
 
 ```
