@@ -43,12 +43,12 @@ db_weather <- db %>%
               AND origin = 'JFK';")
 
 db_911 <- db %>%
-  dbGetQuery("SELECT f.cancelled, f.carrier, f.month, f.day, f.flight,
+  dbGetQuery("SELECT f.origin, f.cancelled, f.carrier, f.month, f.day, f.flight,
                      CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
               FROM flights f
               WHERE year = 2001
-              AND month IN (9,10)
-              AND origin = 'BOS'
+              AND month IN (8,9,10)
+              AND origin IN ('BOS','IAD','LAX','ORD')
               AND dest = 'JFK';")
 ```
 
@@ -74,12 +74,13 @@ my_data2 <- db_flights %>%
 
 # Dataframe for 911 before-and-after comparison
 my_data3 <- db_911 %>%
-  filter(month == 9) %>%
-  mutate(period = ifelse(day %in% c(1,10),"before","after")) %>%
-  group_by(period, carrier) %>%
+  mutate(new_date = as.POSIXct(date,format="%Y-%m-%d %H:%M")) %>%
+  filter(new_date > '2001-08-10 09:00' && new_date < '2011-10-11 09:00') %>%
+  mutate(period = ifelse(new_date < '2001-09-11 09:00',"before","after")) %>%
+  group_by(period, origin,carrier) %>%
   summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
             pct_chg = total_cancelled/total_flight*100)
-my_data3
+my_data3$period <- factor(my_data3$period, levels = c("before","after"))
 ```
 
 ## Data Visualization
@@ -132,12 +133,13 @@ my_plot2
 ## Show the first 10 rows of the two datasets [will be deleted when project is done]
 ```{r}
 db %>%
-  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.dest,
+  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.dest, f.origin,
                      CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
               FROM flights f
               WHERE year = 2001
-              AND month = 1
-              LIMIT 0, 10;")
+              AND month = 9
+              AND dest = 'JFK'
+              LIMIT 0, 1000;")
 
 db %>%
   dbGetQuery("SELECT w.origin, w.precip, w.wind_speed, w.wind_dir, w.wind_gust, w.dewp, w.visib,
@@ -149,9 +151,19 @@ db %>%
 
 ```
 
-## 911 Before-and-After
+## 911 Before-and-After Change in Total Flights Cancellation 
 ```{r}
+my_plot3 <- my_data3 %>%
+  ggplot(aes(x=carrier, y=total_cancelled, fill = period)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  labs(y = "Total Flights Cancellation",
+       title = "Flights from Boston Logan Airport to New York JFK Airport",
+       subtitle = "One Month Before and After 9/11 Attack") +
+  theme_bw() +
+  facet_grid(origin~.)
 
+my_plot3
+ggsave("../before_and_after.png",  my_plot3,height = 18, width = 9)
 ```
 
 
