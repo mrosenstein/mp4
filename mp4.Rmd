@@ -83,7 +83,7 @@ my_data3 <- db_flights %>%
             rate_cancelled = total_cancelled/total_flight,
             avg_dep_delay = mean(dep_delay), total_dep_delay = sum(dep_delay),
             avg_wind_speed = mean(wind_speed), 
-            total_precip = sum(precip)) #*100
+            total_precip = sum(precip))
 
 ```
 
@@ -94,7 +94,7 @@ my_data3 <- db_flights %>%
 my_plot_911 <- my_data1 %>%
   ggplot(aes(x=carrier, y=total_cancelled, fill = period)) +
   geom_bar(stat = 'identity', position = 'dodge') +
-  labs(y = "Total Flights Cancellation",
+  labs(y = "Number of Cancelled Flights", x = "Airline",
        title = "Flights to New York JFK Airport",
        subtitle = "One Month Before and After 9/11 Attack") +
   scale_fill_manual("", values=c("before" = "blue2", "after" = "firebrick3"))+
@@ -104,7 +104,7 @@ my_plot_911
 ```
 
 
-### Total Flights in September from 2001 to 2004.
+### Total Flights in September from 2001 to 2004
 ```{r}
 my_plot_flights <- my_data2 %>%
   ggplot() +
@@ -114,24 +114,26 @@ my_plot_flights <- my_data2 %>%
   scale_y_continuous(labels = c("100K","200K","300K","400K"),breaks = c(100000,200000,300000,400000))+
   scale_color_brewer(palette = "Dark2") +
   labs(title = "Total Flights to JFK Airports in Semptember in 2001, 2002, 2003, and 2004",
-       y = "Total Flights", x = "Date in September") +
+       y = "Number of Flights", x = "Date in September") +
   theme_bw()+
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.key = element_blank(),
+        legend.title = element_blank())
 
 my_plot_flights
 ```
 
-### September 2013 Day-to-Day Variation
+### September 2013 Total Flights Cancellation and Day-to-Day Weather Variation
 ```{r}
 my_plot3 <- my_data3 %>%
   ggplot() +
-  geom_bar(aes(x = day, y = total_cancelled), stat = "identity") +
+  geom_bar(aes(x = day, y = total_cancelled), stat = "identity",alpha = 0.7) +
   geom_line(aes(x = day, y = avg_wind_speed, color = "Daily Average Wind Speed (mph)"))+
   geom_line(aes(x = day, y = total_precip, color = "Total Daily Precipitation (inches)"))+
-  scale_x_continuous(breaks = seq(1,31,1))+
+  scale_x_continuous(breaks = seq(1,30,1))+
   scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "darkseagreen3", 
                                    "Total Daily Precipitation (inches)" = "darkorchid1"))+
-  labs(x = "Date", y= "Total Flights Cancellation",
+  labs(x = "Date in Semptember", y= "Total Flights Cancellation",
        title = "September 2013 Total Flights Cancellation")+
   theme_bw()+
   theme(plot.title = element_text(hjust = 0.5),
