@@ -7,7 +7,7 @@ output:
     code_folding: show
 ---
 
-### Goal: Find the potential causual relations between the number of flights cancelled and major weather factors (wind speed and precipitation).
+### Goal: The effect of flight pattern after 9/11 attack.
 
 ```{r, message = FALSE, warning = FALSE}
 library(mdsr)
@@ -34,7 +34,7 @@ db_911 <- db %>%
               FROM flights f
               WHERE year = 2001
               AND month IN (8,9,10)
-              AND origin IN ('BOS','SFO','LAX')
+              AND origin ='BOS'
               AND dest = 'JFK';")
 
 db_flights <- db %>%
@@ -85,16 +85,6 @@ my_data3 <- db_flights %>%
             avg_wind_speed = mean(wind_speed), 
             total_precip = sum(precip)) #*100
 
-
-# Dataframe for month-to-month variation
-my_data_4 <- db_flights %>%
-  left_join(db_weather, by = c("date" = "new_date")) %>%
-  mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
-  filter(!is.na(wind_speed), !is.na(precip)) %>%
-  group_by(month,carrier) %>%
-  summarize(total_cancelled = sum(cancelled), avg_wind_speed = mean(wind_speed), 
-            avg_wind_gust = mean(wind_gust),total_precip = sum(precip),avg_visib = mean(visib))
-
 ```
 
 ## Data Visualization
@@ -107,17 +97,14 @@ my_plot_911 <- my_data1 %>%
   labs(y = "Total Flights Cancellation",
        title = "Flights to New York JFK Airport",
        subtitle = "One Month Before and After 9/11 Attack") +
-  scale_fill_manual("", values=c("before" = "blue", 
-                                  "after" = "red"))+
-  theme_bw() +
-  facet_grid(origin~.)
+  scale_fill_manual("", values=c("before" = "blue2", "after" = "firebrick3"))+
+  theme_bw()
 
 my_plot_911
-#ggsave("before_and_after.png",  my_plot_911, height = 12, width = 9)
 ```
 
 
-### Total Flights in September in 2001, 2002,2003,2004.
+### Total Flights in September from 2001 to 2004.
 ```{r}
 my_plot_flights <- my_data2 %>%
   ggplot() +
@@ -125,6 +112,7 @@ my_plot_flights <- my_data2 %>%
   geom_vline(xintercept = 11, color = "black") +
   scale_x_continuous(breaks = seq(1,30,1), limits = c(1,30))+
   scale_y_continuous(labels = c("100K","200K","300K","400K"),breaks = c(100000,200000,300000,400000))+
+  scale_color_brewer(palette = "Dark2") +
   labs(title = "Total Flights to JFK Airports in Semptember in 2001, 2002, 2003, and 2004",
        y = "Total Flights", x = "Date in September") +
   theme_bw()+
@@ -136,14 +124,13 @@ my_plot_flights
 ### September 2013 Day-to-Day Variation
 ```{r}
 my_plot3 <- my_data3 %>%
-  #filter(carrier == 'UA') %>%
   ggplot() +
   geom_bar(aes(x = day, y = total_cancelled), stat = "identity") +
   geom_line(aes(x = day, y = avg_wind_speed, color = "Daily Average Wind Speed (mph)"))+
   geom_line(aes(x = day, y = total_precip, color = "Total Daily Precipitation (inches)"))+
   scale_x_continuous(breaks = seq(1,31,1))+
-  scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "blue", 
-                                   "Total Daily Precipitation (inches)" = "red"))+
+  scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "darkseagreen3", 
+                                   "Total Daily Precipitation (inches)" = "darkorchid1"))+
   labs(x = "Date", y= "Total Flights Cancellation",
        title = "September 2013 Total Flights Cancellation")+
   theme_bw()+
@@ -154,26 +141,6 @@ my_plot3 <- my_data3 %>%
         legend.position = "top")
 
 my_plot3
-```
-
-## Show the first 10 rows of the two datasets [will be deleted when project is done]
-```{r}
-db %>%
-  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.dest, f.origin,
-                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
-              FROM flights f
-              WHERE year = 2001
-              AND month = 9
-              AND dest = 'JFK'
-              LIMIT 0, 1000;")
-
-db %>%
-  dbGetQuery("SELECT w.origin, w.precip, w.wind_speed, w.wind_dir, w.wind_gust, w.dewp, w.visib,
-                     CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS date
-              FROM weather w
-              WHERE year = 2015
-              LIMIT 0, 10;")
-
 ```
 
 
