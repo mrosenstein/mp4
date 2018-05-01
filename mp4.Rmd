@@ -48,7 +48,7 @@ db_911 <- db %>%
               FROM flights f
               WHERE year = 2001
               AND month IN (8,9,10)
-              AND origin IN ('BOS','SFO','CLT','LAX')
+              AND origin IN ('BOS','SFO','LAX')
               AND dest = 'JFK';")
 ```
 
@@ -67,7 +67,7 @@ my_data <- db_flights %>%
 my_data2 <- db_flights %>%
   left_join(db_weather, by = c("date" = "new_date")) %>%
   mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
-  filter(!is.na(wind_speed), !is.na(precip), month == 4) %>%
+  filter(!is.na(wind_speed), !is.na(precip), month == 9) %>%
   group_by(day,carrier) %>%
   summarize(avg_dep_delay = mean(dep_delay), total_dep_delay = sum(dep_delay),avg_wind_speed = mean(wind_speed), 
             avg_wind_gust = mean(wind_gust),total_precip = sum(precip)*100,avg_visib = mean(visib))
@@ -119,7 +119,7 @@ my_plot2 <- my_data2 %>%
   scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "blue", 
                                    "Total Daily Precipitation (inches)" = "red"))+
   labs(x = "Date", y= "Average Departure Delay (Minute)",
-       title = "January 2013 Daily Average Departure Delay")+
+       title = "September 2013 Daily Average Departure Delay")+
   theme_bw()+
   theme(plot.title = element_text(hjust = 0.5),
         legend.key = element_blank(),
@@ -143,7 +143,7 @@ my_plot3 <- my_data3 %>%
   facet_grid(origin~.)
 
 my_plot3
-ggsave("before_and_after.png",  my_plot3,height = 18, width = 9)
+ggsave("before_and_after.png",  my_plot3,height = 12, width = 9)
 ```
 
 ## Show the first 10 rows of the two datasets [will be deleted when project is done]
