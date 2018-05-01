@@ -48,7 +48,7 @@ db_911 <- db %>%
               FROM flights f
               WHERE year = 2001
               AND month IN (8,9,10)
-              AND origin IN ('BOS','IAD','LAX','ORD')
+              AND origin IN ('BOS','SFO','CLT','LAX')
               AND dest = 'JFK';")
 ```
 
@@ -163,7 +163,7 @@ my_plot3 <- my_data3 %>%
   facet_grid(origin~.)
 
 my_plot3
-ggsave("../before_and_after.png",  my_plot3,height = 18, width = 9)
+ggsave("before_and_after.png",  my_plot3,height = 18, width = 9)
 ```
 
 
