@@ -2,39 +2,134 @@
 title: "mp4"
 author: "Qiuzi Chen,  Yuri Furukawa, Mae Roesenstein"
 date: "4/24/2018"
-output: html_document
+output: 
+  html_document:
+    code_folding: show
 ---
 
-```{r}
+### Goal: Find the potential causual relations between the number of flights cancelled and major weather factors (wind speed and precipitation).
+
+```{r, message = FALSE, warning = FALSE}
 library(mdsr)
 library(RMySQL)
 library(stringr)
+library(dplyr)
+```
+
+### Make a SQL connection to "airlines" database[^1]
+```{r}
 db <- dbConnect_scidb(dbname = "airlines")
 
-
 dbListTables(db)
+# Show the fields under two SQL tables we are interested in
 dbListFields(db, "flights")
 dbListFields(db, "weather")
 ```
 
+### Write queries to retrieve relevant data
 ```{r}
 db_flights <- db %>%
-  dbGetQuery("SELECT f.cancelled, f.dep_delay,
-                     CONCAT(f.year,'-0',f.month,'-',f.day,' ',f.hour,':00') AS date
+  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.month, f.day, f.hour,
+                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
               FROM flights f
               WHERE year = 2013
-              AND month = 1;")
+              AND origin = 'JFK';")
 
 db_weather <- db %>%
-  dbGetQuery("SELECT year, month, SUBSTRING_INDEX(date, ':', 2) AS new_date, w.precip, w.wind_speed
+  dbGetQuery("SELECT precip, wind_speed, wind_gust, visib,
+                     CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS new_date
               FROM weather w
               WHERE year = 2013
-              AND month = 1;")
+              AND origin = 'JFK';")
+```
+
+### Data Wrangling
+```{r}
+# Dataframe for month-to-month variation
+my_data <- db_flights %>%
+  left_join(db_weather, by = c("date" = "new_date")) %>%
+  mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
+  filter(!is.na(wind_speed), !is.na(precip)) %>%
+  group_by(month,carrier) %>%
+  summarize(total_cancelled = sum(cancelled), avg_wind_speed = mean(wind_speed), 
+            avg_wind_gust = mean(wind_gust),total_precip = sum(precip),avg_visib = mean(visib))
+
+# Dataframe for day-to-day (January only) variation
+my_data2 <- db_flights %>%
+  left_join(db_weather, by = c("date" = "new_date")) %>%
+  mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
+  filter(!is.na(wind_speed), !is.na(precip), month == 4) %>%
+  group_by(day,carrier) %>%
+  summarize(avg_dep_delay = mean(dep_delay), total_dep_delay = sum(dep_delay),avg_wind_speed = mean(wind_speed), 
+            avg_wind_gust = mean(wind_gust),total_precip = sum(precip)*100,avg_visib = mean(visib))
+```
+
+## Data Visualization
+### 2013 Month-to Month variation
+```{r}
+my_plot1 <- my_data %>%
+  filter(carrier == 'UA') %>%
+  ggplot() +
+  geom_bar(aes(x = month, y = total_cancelled), stat = "identity") +
+  geom_line(aes(x = month, y = avg_wind_speed, color = "Monthly Average Wind Speed (mph)"))+
+  geom_line(aes(x = month, y = total_precip, color = "Total Monthly Precipitation (inches)"))+
+  scale_x_continuous(breaks = seq(1,12,1))+
+  scale_colour_manual("", values=c("Monthly Average Wind Speed (mph)" = "blue", 
+                                   "Total Monthly Precipitation (inches)" = "red"))+
+  labs(x = "Month", y= "Number of Cancelled Flights",
+       title = "Number of Cancelled Flights per Month in 2013")+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.key = element_blank(),
+        legend.title = element_blank(),
+        legend.box = "horizontal",
+        legend.position = "top")
+
+my_plot1
+```
+
+### January 2013 Day-to-Day Variation
+```{r}
+my_plot2 <- my_data2 %>%
+  filter(carrier == 'UA') %>%
+  ggplot() +
+  geom_bar(aes(x = day, y = avg_dep_delay), stat = "identity") +
+  geom_line(aes(x = day, y = avg_wind_speed, color = "Daily Average Wind Speed (mph)"))+
+  geom_line(aes(x = day, y = total_precip, color = "Total Daily Precipitation (inches)"))+
+  scale_x_continuous(breaks = seq(1,31,1))+
+  scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "blue", 
+                                   "Total Daily Precipitation (inches)" = "red"))+
+  labs(x = "Date", y= "Average Departure Delay (Minute)",
+       title = "January 2013 Daily Average Departure Delay")+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.key = element_blank(),
+        legend.title = element_blank(),
+        legend.box = "horizontal",
+        legend.position = "top")
+
+my_plot2
+```
+
+## Show the first 10 rows of the two datasets [will be deleted when project is done]
+```{r}
+db %>%
+  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.dest,
+                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
+              FROM flights f
+              WHERE year = 2013
+              AND month = 1
+              LIMIT 0, 10;")
 
 db %>%
-  dbGetQuery("SELECT CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS f_date,
-                     SUBSTRING_INDEX(w.date, ':', 2) AS w_date,
-                     f.cancelled, f.dep_delay, w.precip, w.wind_speed
-              FROM flights f
-              JOIN weather w ON w_date = f_date;")
+  dbGetQuery("SELECT w.origin, w.precip, w.wind_speed, w.wind_dir, w.wind_gust, w.dewp, w.visib,
+                     CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS date
+              FROM weather w
+              WHERE year = 2013
+              AND month = 1
+              LIMIT 0, 10;")
+
 ```
+
+[^1]: This database is available on scidb.smith.edu.
+Feel free to check our GitHub repository.^[https://github.com/mrosenstein/mp4.git]
