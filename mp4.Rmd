@@ -83,7 +83,7 @@ my_data3 <- db_flights %>%
             rate_cancelled = total_cancelled/total_flight,
             avg_dep_delay = mean(dep_delay), total_dep_delay = sum(dep_delay),
             avg_wind_speed = mean(wind_speed), 
-            total_precip = sum(precip)) #*100
+            total_precip = sum(precip))
 
 
 # Dataframe for month-to-month variation
@@ -99,13 +99,13 @@ my_data_4 <- db_flights %>%
 
 ## Data Visualization
 
-## 911 Before-and-After Change in Total Flights Cancellation 
+### 911 Before-and-After Change in Total Flights Cancellation 
 ```{r}
 my_plot_911 <- my_data1 %>%
-  ggplot(aes(x=carrier, y=total_cancelled, fill = period)) +
+  ggplot(aes(x=carrier, y=total_cancelled, fill = period), alpha = 0.9) +
   geom_bar(stat = 'identity', position = 'dodge') +
-  labs(y = "Total Flights Cancellation",
-       title = "Flights to New York JFK Airport",
+  labs(y = "Number of Cancelled Flights", x = "Airline",
+       title = "Flights from Boston Logan Airport to New York JFK Airport",
        subtitle = "One Month Before and After 9/11 Attack") +
   scale_fill_manual("", values=c("before" = "blue", 
                                   "after" = "red"))+
@@ -117,34 +117,49 @@ my_plot_911
 ```
 
 
+<<<<<<< HEAD
 ### Total Flights in September in 2001, 2002,2003,2004.
+=======
+### Total Flights in September from 2001 to 2004
+>>>>>>> 52a7c44c6969668fc1e53d1a6aeca4f1ea3cb88d
 ```{r}
 my_plot_flights <- my_data2 %>%
   ggplot() +
-  geom_line(aes(x = day, y =total_flight,color = factor(year))) +
-  geom_vline(xintercept = 11, color = "black") +
+  geom_line(aes(x = day, y =total_flight,color = factor(year)),alpha = 0.8,lwd = 0.8) +
+  geom_vline(xintercept = 11, color = "black",alpha = 0.8,lwd=0.7,linetype = "dashed") +
   scale_x_continuous(breaks = seq(1,30,1), limits = c(1,30))+
   scale_y_continuous(labels = c("100K","200K","300K","400K"),breaks = c(100000,200000,300000,400000))+
   labs(title = "Total Flights to JFK Airports in Semptember in 2001, 2002, 2003, and 2004",
-       y = "Total Flights", x = "Date in September") +
+       y = "Number of Flights", x = "Date in September") +
   theme_bw()+
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.key = element_blank(),
+        legend.title = element_blank(),
+        legend.box = "horizontal",
+        legend.position = "top")
 
 my_plot_flights
 ```
 
-### September 2013 Day-to-Day Variation
+### September 2013 Total Flights Cancellation and Day-to-Day Weather Variation
 ```{r}
 my_plot3 <- my_data3 %>%
   #filter(carrier == 'UA') %>%
   ggplot() +
-  geom_bar(aes(x = day, y = total_cancelled), stat = "identity") +
+  geom_bar(aes(x = day, y = total_cancelled), stat = "identity",alpha = 0.7) +
   geom_line(aes(x = day, y = avg_wind_speed, color = "Daily Average Wind Speed (mph)"))+
   geom_line(aes(x = day, y = total_precip, color = "Total Daily Precipitation (inches)"))+
+<<<<<<< HEAD
   scale_x_continuous(breaks = seq(1,31,1))+
   scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "blue", 
                                    "Total Daily Precipitation (inches)" = "red"))+
   labs(x = "Date", y= "Total Flights Cancellation",
+=======
+  scale_x_continuous(breaks = seq(1,30,1))+
+  scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "darkseagreen3", 
+                                   "Total Daily Precipitation (inches)" = "darkorchid1"))+
+  labs(x = "Day in Semptember", y= "Total Flights Cancellation",
+>>>>>>> 52a7c44c6969668fc1e53d1a6aeca4f1ea3cb88d
        title = "September 2013 Total Flights Cancellation")+
   theme_bw()+
   theme(plot.title = element_text(hjust = 0.5),
