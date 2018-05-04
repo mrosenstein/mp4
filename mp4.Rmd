@@ -1,6 +1,6 @@
 ---
 title: "mp4"
-author: "Qiuzi Chen,  Yuri Furukawa, Mae Roesenstein"
+author: "Qiuzi Chen,  Yuri Furukawa, Mae Rosenstein"
 date: "4/24/2018"
 output: 
   html_document:
