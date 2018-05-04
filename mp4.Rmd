@@ -1,40 +1,40 @@
 ---
-title: "mp4"
+title: "Suspicion Takes Off: Flying Away From 9/11"
 author: "Qiuzi Chen,  Yuri Furukawa, Mae Rosenstein"
-date: "4/24/2018"
+date: "5/4/2018"
 output: 
   html_document:
+    theme: journal
     code_folding: show
 ---
 
-### Goal: Find the potential causual relations between the number of flights cancelled and major weather factors (wind speed and precipitation).
+Terrorism is powerful. It not only impacts the people who are directly affected by it, but it impacts the lives and behaviors of people who may have simply just heard about it on the news. A series of four coordinated terrorist attacks occured by the Islamic terrorist group al-Qaeda on the United States on September 11, 2001. The attacks killed 2,996 people, injured over 6,000, and caused over a 10 billion dollar  infrastructure and property damage.[^1] Four passenger airliners operated by two major U.S. passenger air carriers, United Airlines and American Airlines, were hijacked by the terrorists. [^2] Two of the planes, American Airlines Flight 11 and United Airlines Flight 175, crashed into the World Trade Center complex in New York City. Both airlines were scheduled domestic passenger flights from Logan International Airport, in Boston, Massachusetts, to Los Angeles International Airport, in Los Angeles, California.
+
+![The image above displays the hijacked routes of the planes involved in the attack on September 11, 2001.](https://upload.wikimedia.org/wikipedia/commons/f/fe/Flight_paths_of_hijacked_planes-September_11_attacks.jpg){.class width=1000px}
 
 ```{r, message = FALSE, warning = FALSE}
+### Loading R packages
 library(mdsr)
 library(RMySQL)
 library(stringr)
 library(dplyr)
 ```
 
-### Make a SQL connection to "airlines" database[^1]
 ```{r}
+### Making a SQL connection to "airlines" database
 db <- dbConnect_scidb(dbname = "airlines")
-
-# Show the fields under two SQL tables we are interested in
-#dbListTables(db)
-#dbListFields(db, "flights")
-#dbListFields(db, "weather")
 ```
 
-### Write queries to retrieve relevant data
 ```{r}
+### Writing queries to retrieve relevant data
+
 db_911 <- db %>%
   dbGetQuery("SELECT f.origin, f.cancelled, f.carrier, f.month, f.day, f.flight,
                      CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
               FROM flights f
               WHERE year = 2001
               AND month IN (8,9,10)
-              AND origin IN ('BOS','SFO','LAX')
+              AND origin = 'BOS'
               AND dest = 'JFK';")
 
 db_flights <- db %>%
@@ -51,29 +51,25 @@ db_weather <- db %>%
               WHERE year = 2013;")
 ```
 
-### Data Wrangling
 ```{r}
-# Dataframe for 911 before-and-after comparison
+### Data wrangling:
+
+# 1st dataframe for 911 before-and-after comparison
 my_data1 <- db_911 %>%
   mutate(new_date = as.POSIXct(date,format="%Y-%m-%d %H:%M")) %>%
   filter(new_date > '2001-08-10 09:00' && new_date < '2001-10-11 09:00') %>%
-  mutate(period = ifelse(new_date < '2001-09-11 09:00',"before","after")) %>%
-  group_by(period, origin,carrier) %>%
+  mutate(period = ifelse(new_date < '2001-09-11 09:00',"Before","After")) %>%
+  group_by(period, carrier) %>%
   summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
             pct_chg = total_cancelled/total_flight*100)
-my_data1$period <- factor(my_data1$period, levels = c("before","after"))
+
+my_data1$carrier <- replace(my_data1$carrier, c(1:8), c("American Airlines", "United Airlines", "Envoy Air", "Delta Air Lines"))
+
+my_data1$period <- factor(my_data1$period, levels = c("Before","After"))
 
 
-# Dataframe for total flights in Semptember from 2001 to 2004
+# 2nd dataframe for day-to-day (September 2013 only) variation
 my_data2 <- db_flights %>%
-  mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
-  filter(year %in% c(2001,2002,2003,2004), month == 9) %>%
-  group_by(year,day) %>% #,carrier
-  summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
-            pct_chg = total_cancelled/total_flight*100)
-
-# Dataframe for day-to-day (September 2013 only) variation
-my_data3 <- db_flights %>%
   filter(year == 2013, month == 9) %>%
   left_join(db_weather, by = c("date" = "new_date")) %>%
   mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
@@ -85,48 +81,78 @@ my_data3 <- db_flights %>%
             avg_wind_speed = mean(wind_speed), 
             total_precip = sum(precip))
 
-
-# Dataframe for month-to-month variation
-my_data_4 <- db_flights %>%
-  left_join(db_weather, by = c("date" = "new_date")) %>%
+# 3rd dataframe for total flights in Semptember from 2001 to 2004
+my_data3 <- db_flights %>%
   mutate(delay = ifelse(dep_delay > 0, 1, 0)) %>%
-  filter(!is.na(wind_speed), !is.na(precip)) %>%
-  group_by(month,carrier) %>%
-  summarize(total_cancelled = sum(cancelled), avg_wind_speed = mean(wind_speed), 
-            avg_wind_gust = mean(wind_gust),total_precip = sum(precip),avg_visib = mean(visib))
+  filter(year %in% c(2001,2002,2003,2004), month == 9) %>%
+  group_by(year,day) %>% #,carrier
+  summarize(total_cancelled = sum(cancelled),total_flight = sum(flight),
+            pct_chg = total_cancelled/total_flight*100)
 
 ```
 
-## Data Visualization
+The attack itself has been publicly analyzed time and time again, but what about the effects of the attack afterwards? How did society respond after 9/11? In this project, we investigated the impact of the 9/11 attacks on the cancellation of flights specifically from Boston Logan International Airport to New York JFK International Airport since JFK Airport is the primary airport in New York City. We compared the total number of cancelled flights (BOS to JFK) one month before 9/11 (from August 10, 2001 9 AM to September 11, 2001 9 AM) and one month after the attack (from September 11 9 AM to October 11 9 AM). We used the “airlines” database [^3] which contains on-time flight data from the Bureau of Transportation Statistics. As shown in Figure 1, there are four airlines that had scheduled flights from Boston Logan Airport to New York JFK Airport, and all four airlines experienced a significant increase in the flight cancellations. Hence, not only the two air carriers associated with 9/11, United Airlines and American Airlines, but also other airliners such as Envoy Air and Delta Airlines were also negatively affected by 9/11 in terms of flight cancellations.
 
-### 911 Before-and-After Change in Total Flights Cancellation 
 ```{r}
 my_plot_911 <- my_data1 %>%
   ggplot(aes(x=carrier, y=total_cancelled, fill = period), alpha = 0.9) +
   geom_bar(stat = 'identity', position = 'dodge') +
-  labs(y = "Number of Cancelled Flights", x = "Airline",
-       title = "Flights from Boston Logan Airport to New York JFK Airport",
-       subtitle = "One Month Before and After 9/11 Attack") +
-  scale_fill_manual("", values=c("before" = "blue", 
-                                  "after" = "red"))+
+  labs(y = "Number of Cancelled Flights", x = "Airline Carrier",
+       caption = "\nFigure 1. Number of cancelled flights from Boston Logan Airport to New York
+               JFK Airport in one month before and after 9/11 attacks") +
+  scale_fill_manual("", values=c("Before" = "blue2", "After" = "firebrick3"))+
   theme_bw() +
-  facet_grid(origin~.)
+  theme(text = element_text(size = 14, family = "serif", color = "gray39"),
+        plot.caption=element_text(hjust = 0, size = 12))
 
 my_plot_911
-#ggsave("before_and_after.png",  my_plot_911, height = 12, width = 9)
 ```
 
+To strengthen the correlation between the 9/11 was the factor of increase in flight cancellations, we looked at the relationship between the flight cancellations in September 2013 and the each day's weather. The weather dataset did not include any year's data other than 2013, therefore we used the data to analyze the correlation between weather and flight cancellations destined to New York. We focused on weather factors such as wind speed and precipitation due to the likelihood of their effect on flight cancellations. As shown in Figure 2, the green line represents the daily average wind speed and the purple line represents the daily precipitation. On September 2nd, precipitation is relatively high and total flight cancellation is also relatively high. However, the wind speed was slower than the previous day. Also, on September 22nd, although both the wind speed and precipitation are strong, there were no flight cancellations on that day. Therefore, we conclude that the relationship between flight cancellations and weather is very weak. 
+
+Figure 2 displays that on September 12th, there was a huge increase in cancellations. Obviously, this is not due to the weather. According to "THE WEEK," Syrian rebels start receiving U.S. weapons from the CIA on that day which likely influenced the increase in flight cancellations. [^4] Additionally, President Obama’s speech on Syria was prominent in the media, and it was a day of remembrance of 9/11 victims.[^5] The discussion of 9/11 and current political events during that time likely had an impact on flight patterns. We assume that the relationship between political events and flight cancellations is much stronger than the relationship between the weather and flight cancellations. 
+
 ```{r}
-my_plot_flights <- my_data2 %>%
+my_plot_weather <- my_data2 %>%
+  ggplot() +
+  geom_bar(aes(x = day, y = total_cancelled), stat = "identity",alpha = 0.7) +
+  geom_line(aes(x = day, y = avg_wind_speed, color = "Daily Average Wind Speed (mph)"))+
+  geom_line(aes(x = day, y = total_precip, color = "Total Daily Precipitation (inches)"))+
+  scale_x_continuous(breaks = seq(1,30,1))+
+  scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "darkseagreen3", 
+                                   "Total Daily Precipitation (inches)" = "darkorchid1"))+
+  labs(x = "Day in Semptember", y= "Number of Cancelled Flights",
+       caption = "\nFigure 2. September 2013 daily total flight cancellations, average wind speed, and total amount
+                of precipitation.")+
+  theme_bw()+
+  theme(text = element_text(size = 14, family = "serif", color = "gray39"),
+        plot.caption=element_text(hjust = 0, size = 12),
+        legend.key = element_blank(),
+        legend.title = element_blank(),
+        legend.box = "horizontal",
+        legend.position = "top")
+
+my_plot_weather
+```
+
+In addition to 9/11 changing society’s perception on the world, it also brought rise to certain behavioral patterns. 9/11 affected many lives, including travelers. Suspicion is sensation that most people have likely encountered. Though it may not always be conscious, every individual has probably had second thoughts about a decision. 
+
+As displayed in Figure 3, 9/11 spiked suspicion in travelers. In 2002, there was a significant decline in flights flying from Logan, the origin of the 9/11 flights, to JFK, the airport located in New York where the terrorist attack occurred. In 2003, the flights destined for JFK increase slightly, and in 2004 it appears that the suspicion had subsided. You may be thinking that there are many reasons as to why there was a decline in  flights to JFK such as the season or weather. However, there are no records of weather on 9/11 in 2002[^6]  or 2003[^7]. Additionally, as displayed in the graphic, the number of flights destined to JFK increased dramatically on September 12th suggesting it was not just a slow travel season. A significant decline in flights to a certain destination is unusual to occur solely on one day. This data supports the fact that people structured their lives around the suspicion of the 9/11 terrorist attack. Though it may not be immediately recognizable, 9/11 impacted the country and society’s suspicious tendencies in various aspects years after the event itself occured. 
+
+```{r}
+my_plot_flights <- my_data3 %>%
   ggplot() +
   geom_line(aes(x = day, y =total_flight,color = factor(year)),alpha = 0.8,lwd = 0.8) +
   geom_vline(xintercept = 11, color = "black",alpha = 0.8,lwd=0.7,linetype = "dashed") +
   scale_x_continuous(breaks = seq(1,30,1), limits = c(1,30))+
   scale_y_continuous(labels = c("100K","200K","300K","400K"),breaks = c(100000,200000,300000,400000))+
-  labs(title = "Total Flights to JFK Airports in Semptember in 2001, 2002, 2003, and 2004",
-       y = "Number of Flights", x = "Date in September") +
+  scale_color_brewer(palette = "Dark2") +
+  labs(y = "Number of Flights", x = "Date in September",
+       caption = "\nFigure 3. Total number of flights to JFK Airport in Semptember in the year of 2001, 2002,
+                2003, and 2004.") +
   theme_bw()+
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(text = element_text(size = 14, family = "serif", color = "gray39"),
+        plot.caption=element_text(hjust = 0, size = 12),
         legend.key = element_blank(),
         legend.title = element_blank(),
         legend.box = "horizontal",
@@ -135,54 +161,14 @@ my_plot_flights <- my_data2 %>%
 my_plot_flights
 ```
 
-### September 2013 Total Flights Cancellation and Day-to-Day Weather Variation
-```{r}
-my_plot3 <- my_data3 %>%
-  #filter(carrier == 'UA') %>%
-  ggplot() +
-  geom_bar(aes(x = day, y = total_cancelled), stat = "identity",alpha = 0.7) +
-  geom_line(aes(x = day, y = avg_wind_speed, color = "Daily Average Wind Speed (mph)"))+
-  geom_line(aes(x = day, y = total_precip, color = "Total Daily Precipitation (inches)"))+
 
-  scale_x_continuous(breaks = seq(1,31,1))+
-  scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "blue", 
-                                   "Total Daily Precipitation (inches)" = "red"))+
-  labs(x = "Date", y= "Total Flights Cancellation"),
-  scale_x_continuous(breaks = seq(1,30,1))+
-  scale_colour_manual("", values=c("Daily Average Wind Speed (mph)" = "darkseagreen3", 
-                                   "Total Daily Precipitation (inches)" = "darkorchid1"))+
-  labs(x = "Day in Semptember", y= "Total Flights Cancellation",
-       title = "September 2013 Total Flights Cancellation")+
-  theme_bw()+
-  theme(plot.title = element_text(hjust = 0.5),
-        legend.key = element_blank(),
-        legend.title = element_blank(),
-        legend.box = "horizontal",
-        legend.position = "top")
-
-my_plot3
-```
-
-## Show the first 10 rows of the two datasets [will be deleted when project is done]
-```{r}
-db %>%
-  dbGetQuery("SELECT f.cancelled, f.dep_delay, f.carrier, f.dest, f.origin,
-                     CONCAT(f.year,'-',f.month,'-',f.day,' ',f.hour,':00') AS date
-              FROM flights f
-              WHERE year = 2001
-              AND month = 9
-              AND dest = 'JFK'
-              LIMIT 0, 1000;")
-
-db %>%
-  dbGetQuery("SELECT w.origin, w.precip, w.wind_speed, w.wind_dir, w.wind_gust, w.dewp, w.visib,
-                     CONCAT(w.year,'-',w.month,'-',w.day,' ',w.hour,':00') AS date
-              FROM weather w
-              WHERE year = 2015
-              LIMIT 0, 10;")
-
-```
+[^1]: "How much did the September 11 terrorist attack cost America?". 2004. Institute for the Analysis of Global Security. Retrieved April 30, 2014.
+[^2]: Matthew J. Morgan (August 4, 2009). The Impact of 9/11 on Politics and War: The Day that Changed Everything?. Palgrave Macmillan. p. 222. ISBN 0-230-60763-2.
+[^3]: This database is available on scidb.smith.edu.
+[^4]: 10 things you need to know today: September 12, 2013. (2013, September 12). Retrieved from http://theweek.com/articles/460103/10-things-need-know-today-september-12-2013
+[^5]: CNN Student News - September 12, 2013. (2013, September 11). Retrieved from https://www.cnn.com/2013/09/11/studentnews/sn-curriculum-thu/index.html
+[^6]: Weather History for KJFK - September, 2002. (n.d.). Retrieved from https://www.wunderground.com/history/airport/KJFK/2002/9/11/DailyHistory.html?req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo=
+[^7]: Weather History for KJFK - September, 2003. (n.d.). Retrieved from https://www.wunderground.com/history/airport/KJFK/2003/9/11/DailyHistory.html?req_city=&req_state=&req_statename=&reqdb.zip=&reqdb.magic=&reqdb.wmo=
 
 
-[^1]: This database is available on scidb.smith.edu.
 Feel free to check our GitHub repository.^[https://github.com/mrosenstein/mp4.git]
